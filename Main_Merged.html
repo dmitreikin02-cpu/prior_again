@@ -124,6 +124,57 @@
             margin-left: 5px;
             font-weight: 600;
         }
+        .schedule-type-selector {
+            background: var(--light-gray);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .schedule-type-selector h4 {
+            color: var(--secondary);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .schedule-type-selector .type-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .schedule-type-selector .type-btn {
+            background: var(--white);
+            color: var(--secondary);
+            border: 2px solid var(--primary);
+            padding: 10px 25px;
+            font-size: 1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        .schedule-type-selector .type-btn:hover {
+            background: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+        .schedule-type-selector .type-btn.active {
+            background: var(--primary);
+            color: var(--white);
+            box-shadow: 0 4px 15px rgba(0, 174, 239, 0.3);
+        }
+        .schedule-type-selector .type-btn.auto {
+            border-color: var(--accent-green);
+        }
+        .schedule-type-selector .type-btn.auto.active {
+            background: var(--accent-green);
+        }
+        .schedule-type-selector .detected-info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: var(--secondary);
+            font-style: italic;
+        }
         .buttons-section {
             display: flex;
             gap: 15px;
@@ -295,6 +346,7 @@
             .file-upload-section,
             .buttons-section,
             .stats,
+            .schedule-type-selector,
             button {
                 display: none !important;
             }
@@ -394,6 +446,16 @@
                 </div>
             </div>
  
+            <div id="scheduleTypeSelector" class="schedule-type-selector hidden">
+                <h4>⚙️ Тип расписания</h4>
+                <div class="type-buttons">
+                    <button class="type-btn auto active" id="typeAuto" onclick="setScheduleType('auto')">🤖 Авто</button>
+                    <button class="type-btn" id="typeMSC" onclick="setScheduleType('MSC')">🏢 МСК</button>
+                    <button class="type-btn" id="typeREG" onclick="setScheduleType('REG')">🌍 Регионы</button>
+                </div>
+                <div class="detected-info" id="detectedInfo"></div>
+            </div>
+
             <div class="buttons-section">
                 <button id="processBtn" disabled>Обработать данные</button>
                 <button id="downloadBtn" class="secondary" disabled>📥 Скачать Excel</button>
@@ -460,6 +522,8 @@
         let file3Data = null;
         let processedData = null;
         let scheduleType = null; // 'MSC' or 'REG'
+        let detectedScheduleType = null; // Auto-detected type
+        let manualOverride = false; // Whether user manually selected type
         
         const BRAND_FILTERS = [
             { keywords: ['VILET', 'ВИЛЕТ'], priority: 1 },
@@ -558,35 +622,104 @@
 
         function detectScheduleType(scheduleData) {
             if (!scheduleData || scheduleData.length === 0) {
+                detectedScheduleType = 'REG';
                 scheduleType = 'REG';
                 return;
             }
 
             const columns = Object.keys(scheduleData[0]).map(k => k.toLowerCase().trim());
             
-            // Check for MSC-specific columns
+            // Check for MSC-specific columns (English format)
             const hasMSCColumns = columns.some(col => 
-                col.includes('день недели') || 
-                col.includes('день') && col.includes('недели')
+                col.includes('order day') || 
+                col.includes('dispatch day') ||
+                col.includes('store n') ||
+                (col.includes('city') && col.includes('sc') && col.includes('brand'))
             );
 
-            // Check for REG-specific columns
+            // Alternative: check for specific MSC column pattern
+            const mscColumnPattern = columns.includes('city') && 
+                                    columns.includes('sc') && 
+                                    columns.includes('brand') && 
+                                    columns.includes('store n');
+
+            // Check for REG-specific columns (Russian format)
             const hasREGColumns = columns.some(col => 
                 col.includes('тц') || 
-                col.includes('временная отмена')
+                col.includes('временная отмена') ||
+                col.includes('последов') && col.includes('загрузки')
             );
 
-            if (hasMSCColumns) {
-                scheduleType = 'MSC';
-                showMessage('Обнаружено расписание МСК - использую логику MSC', 'info');
+            let detectedType;
+            if (hasMSCColumns || mscColumnPattern) {
+                detectedType = 'MSC';
+                detectedScheduleType = 'MSC';
             } else if (hasREGColumns) {
-                scheduleType = 'REG';
-                showMessage('Обнаружено расписание регионов - использую логику REG', 'info');
+                detectedType = 'REG';
+                detectedScheduleType = 'REG';
             } else {
                 // Default to REG if unsure
-                scheduleType = 'REG';
-                showMessage('Тип расписания не определён - использую логику REG по умолчанию', 'info');
+                detectedType = 'REG';
+                detectedScheduleType = 'REG';
             }
+
+            // Set actual schedule type if not manually overridden
+            if (!manualOverride) {
+                scheduleType = detectedType;
+            }
+
+            // Show selector and update info
+            document.getElementById('scheduleTypeSelector').classList.remove('hidden');
+            updateScheduleTypeInfo();
+            updateScheduleTypeButtons();
+        }
+
+        function updateScheduleTypeInfo() {
+            const infoDiv = document.getElementById('detectedInfo');
+            let message = '';
+            
+            if (detectedScheduleType === 'MSC') {
+                message = '🔍 Обнаружено: расписание МСК (ORDER DAY, DISPATCH DAY)';
+            } else if (detectedScheduleType === 'REG') {
+                message = '🔍 Обнаружено: расписание регионов (ТЦ, Последовательность)';
+            } else {
+                message = '🔍 Тип расписания не определён';
+            }
+            
+            if (manualOverride) {
+                message += ' | ✋ Выбрано вручную';
+            }
+            
+            infoDiv.textContent = message;
+        }
+
+        function updateScheduleTypeButtons() {
+            document.getElementById('typeAuto').classList.remove('active');
+            document.getElementById('typeMSC').classList.remove('active');
+            document.getElementById('typeREG').classList.remove('active');
+
+            if (!manualOverride) {
+                document.getElementById('typeAuto').classList.add('active');
+            } else if (scheduleType === 'MSC') {
+                document.getElementById('typeMSC').classList.add('active');
+            } else if (scheduleType === 'REG') {
+                document.getElementById('typeREG').classList.add('active');
+            }
+        }
+
+        function setScheduleType(type) {
+            if (type === 'auto') {
+                manualOverride = false;
+                scheduleType = detectedScheduleType;
+                showMessage('Используется автоматическое определение типа расписания', 'info');
+            } else {
+                manualOverride = true;
+                scheduleType = type;
+                showMessage(`Тип расписания установлен вручную: ${type === 'MSC' ? 'МСК' : 'Регионы'}`, 'info');
+            }
+            
+            updateScheduleTypeInfo();
+            updateScheduleTypeButtons();
         }
 
         function checkFilesReady() {
@@ -1304,6 +1437,8 @@
             file3Data = null;
             processedData = null;
             scheduleType = null;
+            detectedScheduleType = null;
+            manualOverride = false;
 
             document.getElementById('file1').value = '';
             document.getElementById('file2').value = '';
@@ -1323,7 +1458,14 @@
 
             document.getElementById('statsSection').classList.add('hidden');
             document.getElementById('previewSection').classList.add('hidden');
+            document.getElementById('scheduleTypeSelector').classList.add('hidden');
             document.getElementById('messages').innerHTML = '';
+
+            // Reset selector buttons
+            document.getElementById('typeAuto').classList.remove('active');
+            document.getElementById('typeMSC').classList.remove('active');
+            document.getElementById('typeREG').classList.remove('active');
+            document.getElementById('typeAuto').classList.add('active');
 
             showMessage('Все данные сброшены', 'info');
         }
