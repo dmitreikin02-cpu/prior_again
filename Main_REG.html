@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Объединение Excel-файлов</title>
+    
+    <!-- CDN для XLSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- CDN для FileSaver -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f7fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #4a5568;
+            color: white;
+            padding: 20px 30px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .file-inputs {
+            padding: 30px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .file-input-group {
+            margin-bottom: 20px;
+        }
+        .file-input-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2d3748;
+        }
+        .file-input-group input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .file-input-group input[type="file"]:hover {
+            border-color: #3182ce;
+        }
+        .file-name {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #718096;
+            font-style: italic;
+        }
+        .button-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #2c5aa0;
+        }
+        button:disabled {
+            background-color: #cbd5e0;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            padding: 30px;
+            font-size: 16px;
+            color: #4a5568;
+        }
+        .error {
+            text-align: center;
+            padding: 20px;
+            color: #e53e3e;
+            font-size: 14px;
+            background-color: #fff5f5;
+            border: 1px solid #fc8181;
+            border-radius: 4px;
+            margin: 20px 30px;
+        }
+        .success {
+            text-align: center;
+            padding: 20px;
+            color: #38a169;
+            font-size: 14px;
+            background-color: #f0fff4;
+            border: 1px solid #68d391;
+            border-radius: 4px;
+            margin: 20px 30px;
+        }
+        .table-container {
+            max-height: 500px;
+            overflow: auto;
+            margin: 20px 30px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #4a5568;
+            color: white;
+        }
+        th {
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #2d3748;
+            white-space: nowrap;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f7fafc;
+        }
+        tbody tr:nth-child(odd) {
+            background-color: #ffffff;
+        }
+        tbody tr:hover {
+            background-color: #edf2f7;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .download-section {
+            padding: 20px 30px 30px;
+            text-align: center;
+        }
+        #downloadBtn {
+            display: none;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            📊 Объединение Excel-файлов
+        </div>
+        
+        <div class="file-inputs">
+            <div class="file-input-group">
+                <label for="reportFile">📄 Отчёт по ОС на отгрузку (обязательный):</label>
+                <input type="file" id="reportFile" accept=".xlsx, .xls">
+                <div class="file-name" id="reportFileName"></div>
+            </div>
+            
+            <div class="file-input-group">
+                <label for="scheduleFile">📋 Расписание регионов (обязательный):</label>
+                <input type="file" id="scheduleFile" accept=".xlsx, .xls">
+                <div class="file-name" id="scheduleFileName"></div>
+            </div>
+            
+            <div class="file-input-group">
+                <label for="posmFile">📦 POSM (опционально):</label>
+                <input type="file" id="posmFile" accept=".xlsx, .xls">
+                <div class="file-name" id="posmFileName"></div>
+            </div>
+            
+            <div class="button-container">
+                <button id="processBtn" onclick="processFiles()" disabled>Обработать</button>
+            </div>
+        </div>
+        
+        <div id="loadingMessage" class="loading hidden">⏳ Обработка данных...</div>
+        <div id="errorMessage" class="error hidden"></div>
+        <div id="successMessage" class="success hidden"></div>
+        
+        <div id="tableContainer" class="table-container hidden">
+            <table id="resultTable">
+                <thead>
+                    <tr>
+                        <th>Транспорт/№ заказа</th>
+                        <th class="text-right">№ магазина</th>
+                        <th>Бренд/ТЦ</th>
+                        <th>Место</th>
+                        <th class="text-right">Кол-во кор</th>
+                        <th class="text-right">Последов-ть Бренда в ТС</th>
+                        <th class="text-right">Последов-ть внутри Бренда</th>
+                        <th>Коммент.</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="download-section">
+            <button id="downloadBtn" onclick="exportToExcel()">Скачать Excel</button>
+        </div>
+    </div>
+ 
+    <script>
+        let processedData = [];
+        let reportFileData = null;
+        let scheduleFileData = null;
+        let posmFileData = null;
+        // Обработчики выбора файлов
+        document.getElementById('reportFile').addEventListener('change', function(e) {
+            reportFileData = e.target.files[0];
+            document.getElementById('reportFileName').textContent = reportFileData ? reportFileData.name : '';
+            checkRequiredFiles();
+        });
+        document.getElementById('scheduleFile').addEventListener('change', function(e) {
+            scheduleFileData = e.target.files[0];
+            document.getElementById('scheduleFileName').textContent = scheduleFileData ? scheduleFileData.name : '';
+            checkRequiredFiles();
+        });
+        document.getElementById('posmFile').addEventListener('change', function(e) {
+            posmFileData = e.target.files[0];
+            document.getElementById('posmFileName').textContent = posmFileData ? posmFileData.name : '';
+        });
+        function checkRequiredFiles() {
+            const processBtn = document.getElementById('processBtn');
+            processBtn.disabled = !(reportFileData && scheduleFileData);
+        }
+        // Функция чтения Excel файла
+        function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                        resolve(jsonData);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = function(error) {
+                    reject(error);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        // Функция фильтрации отчёта
+        function filterReport(data) {
+            return data.filter(row => {
+                const orderType = (row['Тип заказа'] || '').toString().toUpperCase();
+                const storeNumber = (row['Номер магазина'] || '').toString();
+                
+                // Исключить строки с MOP
+                if (orderType.includes('MOP')) return false;
+                
+                // Исключить строки с POSM
+                if (orderType.includes('POSM')) return false;
+                
+                // Исключить строки с нецифровыми символами в номере магазина
+                if (!/^\d+$/.test(storeNumber)) return false;
+                
+                return true;
+            });
+        }
+        // Функция фильтрации расписания
+        function filterSchedule(data) {
+            return data.filter(row => {
+                const tempCancel = (row['ВРЕМЕННАЯ ОТМЕНА'] || '').toString().toUpperCase();
+                return tempCancel !== 'X';
+            });
+        }
+        // Маппинг русских названий брендов на английские (глобально)
+        const brandMapping = {
+            'МААГ': 'MAAG',
+            'МАAG': 'MAAG',
+            'MAAG': 'MAAG',
+            'ЭКРЮ': 'ECRU',
+            'ECRU': 'ECRU',
+            'ДАБ': 'DUB',
+            'DAB': 'DUB',
+            'DUB': 'DUB',
+            'ВИЛЕТ': 'VILET',
+            'VILET': 'VILET',
+            '12 STOREEZ': '12 STOREEZ',
+            '12STOREEZ': '12 STOREEZ'
+        };
+        
+        // Функция нормализации названия бренда (глобально)
+        function normalizeBrand(brandName) {
+            if (!brandName) return '';
+            
+            // Берём первое слово и приводим к верхнему регистру
+            const firstWord = brandName.toString().trim().split(/[\s\/]/)[0].toUpperCase();
+            
+            // Применяем маппинг
+            return brandMapping[firstWord] || firstWord;
+        }
+        // Функция обогащения данных из расписания
+        function enrichWithSchedule(reportData, scheduleData) {
+            
+            // Создаем Map для быстрого поиска: магазин -> список брендов с их данными
+            const scheduleMap = new Map();
+            
+            // Выводим названия колонок для отладки (первая строка)
+            if (scheduleData.length > 0) {
+                console.log('Колонки в расписании:', Object.keys(scheduleData[0]));
+            }
+            
+            scheduleData.forEach(row => {
+                const brand = normalizeBrand(row['Бренд'] || '');
+                const storeNumber = (row['Номер магазина'] || '').toString().trim();
+                
+                if (!storeNumber || !brand) return;
+                
+                // Пробуем разные варианты названий колонок
+                const tc = row['ТЦ'] || '';
+                const brandOrder = row['Последов-ть загрузки ТЦ'] || 
+                                  row['Последовательность загрузки ТЦ'] || 
+                                  row['Последов-ть загрузки ТЦ '] || '';
+                const internalOrder = row['Последов-ть загрузки от кабины'] || 
+                                     row['Последовательность загрузки от кабины'] || 
+                                     row['Последов-ть загрузки от кабины '] || '';
+                
+                // Создаем структуру для магазина, если её ещё нет
+                if (!scheduleMap.has(storeNumber)) {
+                    scheduleMap.set(storeNumber, new Map());
+                }
+                
+                // Добавляем данные для конкретного бренда в этом магазине
+                scheduleMap.get(storeNumber).set(brand, {
+                    tc: tc,
+                    brandOrder: brandOrder,
+                    internalOrder: internalOrder
+                });
+                
+                // Отладка: выводим первые 5 записей
+                if (scheduleMap.size <= 2 && scheduleMap.get(storeNumber).size <= 3) {
+                    console.log(`Магазин: ${storeNumber}, Бренд: ${brand}, ТЦ: ${tc}, Посл.ТЦ: ${brandOrder}, Посл.кабина: ${internalOrder}`);
+                }
+            });
+            
+            // Группируем данные отчёта по ключевым полям и считаем уникальные коробы
+            const groupedData = new Map();
+            
+            // Выводим названия колонок для отладки (первая строка)
+            if (reportData.length > 0) {
+                console.log('Колонки в отчете:', Object.keys(reportData[0]));
+            }
+            
+            reportData.forEach(row => {
+                const brand = (row['Направление'] || '').toString().trim();
+                const storeNumber = (row['Номер магазина'] || '').toString().trim();
+                const transport = row['Номер рейса'] || '';
+                const mesto = row['Место'] || '';
+                const korobNum = (row['Короб'] || '').toString().trim();
+                
+                // Создаем уникальный ключ для группировки: транспорт + магазин + бренд + место
+                const groupKey = `${transport}_${storeNumber}_${brand}_${mesto}`;
+                
+                if (!groupedData.has(groupKey)) {
+                    groupedData.set(groupKey, {
+                        transport: transport,
+                        storeNumber: storeNumber,
+                        brand: brand,
+                        mesto: mesto,
+                        uniqueBoxes: new Set()
+                    });
+                }
+                
+                // Добавляем номер короба в Set для подсчета уникальных
+                if (korobNum) {
+                    groupedData.get(groupKey).uniqueBoxes.add(korobNum);
+                }
+            });
+            
+            // Обогащаем данные отчёта
+            const enrichedData = [];
+            let foundCount = 0;
+            let notFoundCount = 0;
+            
+            groupedData.forEach((groupInfo) => {
+                // Нормализуем бренд из отчета
+                const normalizedBrand = normalizeBrand(groupInfo.brand);
+                const storeNumber = groupInfo.storeNumber;
+                
+                // Ищем магазин в расписании
+                const storeSchedule = scheduleMap.get(storeNumber);
+                let scheduleInfo = null;
+                
+                if (storeSchedule) {
+                    // Ищем данные для конкретного бренда в этом магазине
+                    scheduleInfo = storeSchedule.get(normalizedBrand);
+                    
+                    if (scheduleInfo) {
+                        foundCount++;
+                        // Отладка: выводим первые 2 найденных совпадения
+                        if (foundCount <= 2) {
+                            console.log(`✓ Найдено: Магазин ${storeNumber}, Бренд ${normalizedBrand} → ТЦ: ${scheduleInfo.tc}, Посл: ${scheduleInfo.brandOrder}/${scheduleInfo.internalOrder}`);
+                        }
+                    } else {
+                        notFoundCount++;
+                        // Отладка: выводим первые 3 ненайденных
+                        if (notFoundCount <= 3) {
+                            console.log(`✗ Не найдено: Магазин ${storeNumber}, Бренд ${normalizedBrand} (из отчета: "${groupInfo.brand}")`);
+                            console.log(`  Доступные бренды в магазине ${storeNumber}:`, Array.from(storeSchedule.keys()));
+                        }
+                    }
+                } else {
+                    notFoundCount++;
+                    if (notFoundCount <= 3) {
+                        console.log(`✗ Магазин ${storeNumber} не найден в расписании`);
+                        console.log(`  Доступные магазины (первые 5):`, Array.from(scheduleMap.keys()).slice(0, 5));
+                    }
+                }
+                
+                const finalScheduleInfo = scheduleInfo || {
+                    tc: '',
+                    brandOrder: '',
+                    internalOrder: ''
+                };
+                
+                enrichedData.push({
+                    'Транспорт/№ заказа': groupInfo.transport,
+                    '№ магазина': groupInfo.storeNumber,
+                    'Бренд': normalizedBrand,
+                    'ТЦ': finalScheduleInfo.tc,
+                    'Бренд/ТЦ': finalScheduleInfo.tc ? `${normalizedBrand} / ${finalScheduleInfo.tc}` : normalizedBrand,
+                    'Место': groupInfo.mesto,
+                    'Кол-во кор': groupInfo.uniqueBoxes.size,
+                    'Последов-ть Бренда в ТС': finalScheduleInfo.brandOrder,
+                    'Последов-ть внутри Бренда': finalScheduleInfo.internalOrder,
+                    'Коммент.': ''
+                });
+            });
+            
+            console.log(`Итого: найдено совпадений: ${foundCount}, не найдено: ${notFoundCount}`);
+            
+            return enrichedData;
+        }
+        // Функция добавления POSM строк
+        function addPOSMRows(data, posmData) {
+            if (!posmData || posmData.length === 0) {
+                return data;
+            }
+            
+            // Создаем Map для группировки POSM по ключу (магазин -> бренд -> список строк)
+            const posmMap = new Map();
+            
+            posmData.forEach(row => {
+                const brand = normalizeBrand(row['Бренд'] || '');
+                const storeNumber = (row['магазин'] || '').toString().trim();
+                
+                if (!storeNumber || !brand) return;
+                
+                // Создаем структуру для магазина, если её ещё нет
+                if (!posmMap.has(storeNumber)) {
+                    posmMap.set(storeNumber, new Map());
+                }
+                
+                if (!posmMap.get(storeNumber).has(brand)) {
+                    posmMap.get(storeNumber).set(brand, []);
+                }
+                
+                // Определяем комментарий
+                const name = (row['Наименование'] || '').toString().toLowerCase();
+                let comment = 'Оборудование';
+                if (name.includes('трансфер')) {
+                    comment = 'трансфер';
+                } else if (name.includes('posm')) {
+                    comment = 'POSM';
+                }
+                
+                // Формируем значение для "Место"
+                const size = (row['Размер'] || '').toString().trim();
+                const weight = (row['Вес'] || '').toString().trim();
+                const mesto = size && weight ? `${size} ${weight}` : (size || weight || '');
+                
+                posmMap.get(storeNumber).get(brand).push({
+                    'Транспорт/№ заказа': row['Рейс'] || '',
+                    '№ магазина': storeNumber,
+                    'Бренд': brand,
+                    'ТЦ': '',
+                    'Бренд/ТЦ': '',
+                    'Место': mesto,
+                    'Кол-во кор': row['Кол-во'] || '',
+                    'Последов-ть Бренда в ТС': '',
+                    'Последов-ть внутри Бренда': '',
+                    'Коммент.': comment
+                });
+            });
+            
+            // Вставляем POSM строки после соответствующих основных строк
+            const result = [];
+            
+            data.forEach(row => {
+                // Добавляем основную строку
+                result.push(row);
+                
+                // Ищем POSM строки для этого магазина и бренда
+                const brand = row['Бренд'];
+                const storeNumber = row['№ магазина'].toString();
+                
+                const storePOSM = posmMap.get(storeNumber);
+                
+                if (storePOSM) {
+                    const brandPOSM = storePOSM.get(brand);
+                    
+                    if (brandPOSM) {
+                        brandPOSM.forEach(posmRow => {
+                            // Наследуем значения сортировки и Бренд/ТЦ от основной строки
+                            posmRow['Последов-ть Бренда в ТС'] = row['Последов-ть Бренда в ТС'];
+                            posmRow['Последов-ть внутри Бренда'] = row['Последов-ть внутри Бренда'];
+                            posmRow['Бренд/ТЦ'] = row['Бренд/ТЦ'];
+                            result.push(posmRow);
+                        });
+                        // Удаляем использованные POSM строки
+                        storePOSM.delete(brand);
+                    }
+                }
+            });
+            
+            return result;
+        }
+        // Функция сортировки
+        function sortFinalData(data) {
+            const commentOrder = {
+                '': 0,
+                'трансфер': 1,
+                'POSM': 2,
+                'Оборудование': 3
+            };
+            
+            return data.sort((a, b) => {
+                // Уровень 1: Последов-ть Бренда в ТС
+                const brandOrderA = parseFloat(a['Последов-ть Бренда в ТС']) || 999999;
+                const brandOrderB = parseFloat(b['Последов-ть Бренда в ТС']) || 999999;
+                if (brandOrderA !== brandOrderB) {
+                    return brandOrderA - brandOrderB;
+                }
+                
+                // Уровень 2: Последов-ть внутри Бренда
+                const internalOrderA = parseFloat(a['Последов-ть внутри Бренда']) || 999999;
+                const internalOrderB = parseFloat(b['Последов-ть внутри Бренда']) || 999999;
+                if (internalOrderA !== internalOrderB) {
+                    return internalOrderA - internalOrderB;
+                }
+                
+                // Уровень 3: № магазина
+                const storeA = parseInt(a['№ магазина']) || 0;
+                const storeB = parseInt(b['№ магазина']) || 0;
+                if (storeA !== storeB) {
+                    return storeA - storeB;
+                }
+                
+                // Уровень 4: По типу комментария (проверяем одинаковые ли Бренд/ТЦ)
+                if (a['Бренд/ТЦ'] === b['Бренд/ТЦ']) {
+                    const commentA = commentOrder[a['Коммент.']] !== undefined ? commentOrder[a['Коммент.']] : 999;
+                    const commentB = commentOrder[b['Коммент.']] !== undefined ? commentOrder[b['Коммент.']] : 999;
+                    return commentA - commentB;
+                }
+                
+                return 0;
+            });
+        }
+        // Функция отображения таблицы
+        function displayTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                
+                // Транспорт/№ заказа
+                const td1 = document.createElement('td');
+                td1.textContent = row['Транспорт/№ заказа'];
+                tr.appendChild(td1);
+                
+                // № магазина
+                const td2 = document.createElement('td');
+                td2.textContent = row['№ магазина'];
+                td2.className = 'text-right';
+                tr.appendChild(td2);
+                
+                // Бренд/ТЦ
+                const td3 = document.createElement('td');
+                td3.textContent = row['Бренд/ТЦ'];
+                tr.appendChild(td3);
+                
+                // Место
+                const td4 = document.createElement('td');
+                td4.textContent = row['Место'];
+                tr.appendChild(td4);
+                
+                // Кол-во кор
+                const td5 = document.createElement('td');
+                td5.textContent = row['Кол-во кор'];
+                td5.className = 'text-right';
+                tr.appendChild(td5);
+                
+                // Последов-ть Бренда в ТС
+                const td6 = document.createElement('td');
+                td6.textContent = row['Последов-ть Бренда в ТС'];
+                td6.className = 'text-right';
+                tr.appendChild(td6);
+                
+                // Последов-ть внутри Бренда
+                const td7 = document.createElement('td');
+                td7.textContent = row['Последов-ть внутри Бренда'];
+                td7.className = 'text-right';
+                tr.appendChild(td7);
+                
+                // Коммент.
+                const td8 = document.createElement('td');
+                td8.textContent = row['Коммент.'];
+                tr.appendChild(td8);
+                
+                tbody.appendChild(tr);
+            });
+            
+            document.getElementById('tableContainer').classList.remove('hidden');
+            document.getElementById('downloadBtn').style.display = 'inline-block';
+        }
+        // Функция экспорта в Excel
+        function exportToExcel() {
+            // Подготавливаем данные для экспорта
+            const exportData = processedData.map(row => ({
+                'Транспорт/№ заказа': row['Транспорт/№ заказа'],
+                '№ магазина': row['№ магазина'],
+                'Бренд/ТЦ': row['Бренд/ТЦ'],
+                'Место': row['Место'],
+                'Кол-во кор': row['Кол-во кор'],
+                'Последов-ть Бренда в ТС': row['Последов-ть Бренда в ТС'],
+                'Последов-ть внутри Бренда': row['Последов-ть внутри Бренда'],
+                'Коммент.': row['Коммент.']
+            }));
+            
+            // Создаем workbook и worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            
+            // Устанавливаем ширину колонок
+            ws['!cols'] = [
+                { wch: 25 }, // Транспорт/№ заказа
+                { wch: 12 }, // № магазина
+                { wch: 20 }, // Бренд/ТЦ
+                { wch: 20 }, // Место
+                { wch: 12 }, // Кол-во кор
+                { wch: 22 }, // Последов-ть Бренда в ТС
+                { wch: 22 }, // Последов-ть внутри Бренда
+                { wch: 15 }  // Коммент.
+            ];
+            
+            XLSX.utils.book_append_sheet(wb, ws, 'Результат');
+            
+            // Генерируем файл
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: 'application/octet-stream' });
+            
+            // Сохраняем файл
+            saveAs(blob, 'result.xlsx');
+        }
+        // Главная функция обработки
+        async function processFiles() {
+            try {
+                // Скрываем предыдущие сообщения и таблицу
+                document.getElementById('errorMessage').classList.add('hidden');
+                document.getElementById('successMessage').classList.add('hidden');
+                document.getElementById('tableContainer').classList.add('hidden');
+                document.getElementById('downloadBtn').style.display = 'none';
+                
+                // Показываем индикатор загрузки
+                document.getElementById('loadingMessage').classList.remove('hidden');
+                
+                // Небольшая задержка для отображения загрузки
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Читаем файлы
+                const reportData = await readExcelFile(reportFileData);
+                const scheduleData = await readExcelFile(scheduleFileData);
+                let posmData = null;
+                
+                if (posmFileData) {
+                    posmData = await readExcelFile(posmFileData);
+                }
+                
+                // Проверяем наличие данных
+                if (!reportData || reportData.length === 0) {
+                    throw new Error('Файл отчёта пуст или не содержит данных');
+                }
+                
+                if (!scheduleData || scheduleData.length === 0) {
+                    throw new Error('Файл расписания пуст или не содержит данных');
+                }
+                
+                // Применяем фильтры
+                const filteredReport = filterReport(reportData);
+                const filteredSchedule = filterSchedule(scheduleData);
+                
+                if (filteredReport.length === 0) {
+                    throw new Error('После фильтрации отчёт не содержит данных');
+                }
+                
+                // Обогащаем данные из расписания
+                let enrichedData = enrichWithSchedule(filteredReport, filteredSchedule);
+                
+                // Добавляем POSM строки
+                if (posmData && posmData.length > 0) {
+                    enrichedData = addPOSMRows(enrichedData, posmData);
+                }
+                
+                // Сортируем данные
+                processedData = sortFinalData(enrichedData);
+                
+                // Скрываем индикатор загрузки
+                document.getElementById('loadingMessage').classList.add('hidden');
+                
+                // Отображаем таблицу
+                displayTable(processedData);
+                
+                // Показываем сообщение об успехе
+                const successMsg = document.getElementById('successMessage');
+                successMsg.textContent = `✅ Успешно обработано ${processedData.length} строк`;
+                successMsg.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Ошибка при обработке:', error);
+                
+                // Скрываем индикатор загрузки
+                document.getElementById('loadingMessage').classList.add('hidden');
+                
+                // Показываем сообщение об ошибке
+                const errorMsg = document.getElementById('errorMessage');
+                errorMsg.textContent = `❌ Ошибка: ${error.message}`;
+                errorMsg.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
